@@ -1,0 +1,12 @@
+FROM ghcr.io/warewulf/warewulf-rockylinux:8
+
+RUN dnf install -y kernel-devel kernel-headers https://github.com/warewulf/warewulf/releases/download/v4.5.8/warewulf-dracut-4.5.8-1.el8.noarch.rpm \
+    && dnf -y clean all
+
+COPY install_vultr_repo.sh install_vultr_repo.sh
+
+RUN bash install_vultr_repo.sh \
+    && dnf install -y vultr-nvidia-client-drivers \
+    && for dir in /usr/src/kernels/*; do /bin/sh /opt/nvidia/drivers/linux_nvidia_client.run -X --ui=none --no-questions --no-check-for-alternate-installs --kernel-name=$(basename $dir); done
+
+RUN rm /etc/machine-id
