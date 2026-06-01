@@ -16,150 +16,48 @@ on:
 
 
 jobs:
-  build:
+  # Generate build and merge matrices from images.json so each image is
+  # defined in one place. Adding an image or arch requires only editing
+  # images.json, not this workflow.
+  setup:
     runs-on: ubuntu-latest
+    outputs:
+      build_matrix: ${{ steps.matrices.outputs.build_matrix }}
+      merge_matrix: ${{ steps.matrices.outputs.merge_matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Generate matrices
+        id: matrices
+        run: python3 .github/workflows/gen-matrix.py >> "$GITHUB_OUTPUT"
+
+
+  build:
+    needs: setup
+    runs-on: ${{ matrix.runner }}
 
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: rockylinux
-            version: "8"
-            context: rockylinux-8
-            file: rockylinux-8/Containerfile
-          - os: rockylinux
-            version: "8.9"
-            context: rockylinux-8
-            file: rockylinux-8/Containerfile-8.9
-          - os: rockylinux
-            version: "8.10"
-            context: rockylinux-8
-            file: rockylinux-8/Containerfile-8.10
-          - os: rockylinux
-            version: "9"
-            context: rockylinux-9
-            file: rockylinux-9/Containerfile
-          - os: rockylinux
-            version: "9.7"
-            context: rockylinux-9
-            file: rockylinux-9/Containerfile-9.7
-          - os: rockylinux
-            version: "9.8"
-            context: rockylinux-9
-            file: rockylinux-9/Containerfile-9.8
-          - os: rockylinux
-            version: "10"
-            context: rockylinux-10
-            file: rockylinux-10/Containerfile
-          - os: rockylinux
-            version: "10.1"
-            context: rockylinux-10
-            file: rockylinux-10/Containerfile-10.1
-          - os: rockylinux
-            version: "10.2"
-            context: rockylinux-10
-            file: rockylinux-10/Containerfile-10.2
-          - os: almalinux
-            version: "8"
-            context: almalinux-8
-            file: almalinux-8/Containerfile
-          - os: almalinux
-            version: "8.9"
-            context: almalinux-8
-            file: almalinux-8/Containerfile-8.9
-          - os: almalinux
-            version: "8.10"
-            context: almalinux-8
-            file: almalinux-8/Containerfile-8.10
-          - os: almalinux
-            version: "9"
-            context: almalinux-9
-            file: almalinux-9/Containerfile
-          - os: almalinux
-            version: "9.7"
-            context: almalinux-9
-            file: almalinux-9/Containerfile-9.7
-          - os: almalinux
-            version: "9.8"
-            context: almalinux-9
-            file: almalinux-9/Containerfile-9.8
-          - os: almalinux
-            version: "10"
-            context: almalinux-10
-            file: almalinux-10/Containerfile
-          - os: almalinux
-            version: "10.1"
-            context: almalinux-10
-            file: almalinux-10/Containerfile-10.1
-          - os: almalinux
-            version: "10.2"
-            context: almalinux-10
-            file: almalinux-10/Containerfile-10.2
-          - os: leap
-            version: "15"
-            context: leap
-            file: leap/Containerfile-15
-          - os: leap
-            version: "16"
-            context: leap
-            file: leap/Containerfile-16.0
-          - os: leap
-            version: "16.0"
-            context: leap
-            file: leap/Containerfile-16.0
-          - os: tumbleweed
-            version: latest
-            context: tumbleweed
-            file: tumbleweed/Containerfile
-          - os: debian
-            version: "12"
-            context: debian
-            file: debian/Containerfile-12
-          - os: debian
-            version: "13"
-            context: debian
-            file: debian/Containerfile-13
-          - os: openeuler
-            version: "24.03"
-            context: openeuler-24.03
-            file: openeuler-24.03/Containerfile
-          - os: ubuntu
-            version: "24.04"
-            context: ubuntu
-            file: ubuntu/Containerfile-24.04
-          - os: ubuntu
-            version: "26.04"
-            context: ubuntu
-            file: ubuntu/Containerfile-26.04
+      matrix: ${{ fromJson(needs.setup.outputs.build_matrix) }}
 
     permissions:
       contents: read
       packages: write
-      # This is used to complete the identity challenge
-      # with sigstore/fulcio when running outside of PRs.
+      # Required for keyless signing with sigstore/fulcio when not in a PR.
       id-token: write
-
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Make Containerfiles
+      # Some OS directories generate versioned Containerfiles from templates.
+      - name: Generate versioned Containerfiles
         run: |
-          make -C rockylinux-8
-          make -C rockylinux-9
-          make -C rockylinux-10
-          make -C almalinux-8
-          make -C almalinux-9
-          make -C almalinux-10
+          if [ -f "${{ matrix.context }}/Makefile" ]; then
+            make -C "${{ matrix.context }}"
+          fi
 
-      # Install the cosign tool
-      # https://github.com/sigstore/cosign-installer
-      - name: Install Cosign
-        if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@v3.5.0
-
-      # Workaround: https://github.com/docker/build-push-action/issues/461
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v4
 
@@ -179,31 +77,99 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: |
-            ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }}
-          tags: |
-            type=schedule
-            type=raw,${{ matrix.version }}
+          images: ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }}
 
-      # Build and push Docker image with Buildx
+      # Build single-platform image and push by content-addressed digest.
+      # No tag is written here; the merge job assembles the manifest index.
       # https://github.com/docker/build-push-action
-      - name: Build and push image
-        id: build-and-push
+      - name: Build and push image by digest
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }},oci-mediatypes=true,push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.os }}-${{ matrix.version }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.os }}-${{ matrix.version }}-${{ matrix.platform }}
 
-      # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
-      - name: Sign the images with GitHub OIDC Token
+      - name: Export digest
         if: github.event_name != 'pull_request'
-        env:
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-          TAGS: ${{ steps.meta.outputs.tags }}
-        run: cosign sign --yes "${TAGS}@${DIGEST}"
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.os }}-${{ matrix.version }}-${{ matrix.platform_pair }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+
+  # Combine per-arch digests into a multi-arch manifest index, then sign.
+  # Skipped on pull requests — PRs validate builds only, never publish.
+  merge:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    needs: [setup, build]
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.merge_matrix) }}
+
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digests-${{ matrix.os }}-${{ matrix.version }}-*
+          merge-multiple: true
+          path: /tmp/digests
+
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log into registry ghcr.io
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }}
+          tags: |
+            type=schedule
+            type=raw,${{ matrix.version }}
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          mapfile -t tag_args < <(jq -cr '.tags[] | "-t", .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          mapfile -t digest_args < <(printf 'ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }}@sha256:%s\n' *)
+          docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
+
+      # Install the cosign tool
+      # https://github.com/sigstore/cosign-installer
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
+
+      # Sign the manifest index by digest — digests are immutable, tags are not.
+      # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
+      - name: Sign the manifest
+        run: |
+          image="ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }}:${{ matrix.version }}"
+          digest=$(docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}')
+          cosign sign --yes "${image}@${digest}"

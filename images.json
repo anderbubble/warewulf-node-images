@@ -1,0 +1,70 @@
+{
+  "arches": [
+    {"platform": "linux/amd64", "runner": "ubuntu-latest"},
+    {"platform": "linux/arm64", "runner": "ubuntu-24.04-arm"}
+  ],
+  "images": [
+    {
+      "os": "rockylinux",
+      "entries": [
+        {"version": "8",    "context": "rockylinux-8",  "file": "rockylinux-8/Containerfile"},
+        {"version": "8.9",  "context": "rockylinux-8",  "file": "rockylinux-8/Containerfile-8.9"},
+        {"version": "8.10", "context": "rockylinux-8",  "file": "rockylinux-8/Containerfile-8.10"},
+        {"version": "9",    "context": "rockylinux-9",  "file": "rockylinux-9/Containerfile"},
+        {"version": "9.7",  "context": "rockylinux-9",  "file": "rockylinux-9/Containerfile-9.7"},
+        {"version": "9.8",  "context": "rockylinux-9",  "file": "rockylinux-9/Containerfile-9.8"},
+        {"version": "10",   "context": "rockylinux-10", "file": "rockylinux-10/Containerfile"},
+        {"version": "10.1", "context": "rockylinux-10", "file": "rockylinux-10/Containerfile-10.1"},
+        {"version": "10.2", "context": "rockylinux-10", "file": "rockylinux-10/Containerfile-10.2"}
+      ]
+    },
+    {
+      "os": "almalinux",
+      "entries": [
+        {"version": "8",    "context": "almalinux-8",  "file": "almalinux-8/Containerfile"},
+        {"version": "8.9",  "context": "almalinux-8",  "file": "almalinux-8/Containerfile-8.9"},
+        {"version": "8.10", "context": "almalinux-8",  "file": "almalinux-8/Containerfile-8.10"},
+        {"version": "9",    "context": "almalinux-9",  "file": "almalinux-9/Containerfile"},
+        {"version": "9.7",  "context": "almalinux-9",  "file": "almalinux-9/Containerfile-9.7"},
+        {"version": "9.8",  "context": "almalinux-9",  "file": "almalinux-9/Containerfile-9.8"},
+        {"version": "10",   "context": "almalinux-10", "file": "almalinux-10/Containerfile"},
+        {"version": "10.1", "context": "almalinux-10", "file": "almalinux-10/Containerfile-10.1"},
+        {"version": "10.2", "context": "almalinux-10", "file": "almalinux-10/Containerfile-10.2"}
+      ]
+    },
+    {
+      "os": "leap",
+      "entries": [
+        {"version": "15",   "context": "leap", "file": "leap/Containerfile-15"},
+        {"version": "16",   "context": "leap", "file": "leap/Containerfile-16.0"},
+        {"version": "16.0", "context": "leap", "file": "leap/Containerfile-16.0"}
+      ]
+    },
+    {
+      "os": "tumbleweed",
+      "entries": [
+        {"version": "latest", "context": "tumbleweed", "file": "tumbleweed/Containerfile"}
+      ]
+    },
+    {
+      "os": "debian",
+      "entries": [
+        {"version": "12", "context": "debian", "file": "debian/Containerfile-12"},
+        {"version": "13", "context": "debian", "file": "debian/Containerfile-13"}
+      ]
+    },
+    {
+      "os": "openeuler",
+      "entries": [
+        {"version": "24.03", "context": "openeuler-24.03", "file": "openeuler-24.03/Containerfile"}
+      ]
+    },
+    {
+      "os": "ubuntu",
+      "entries": [
+        {"version": "24.04", "context": "ubuntu", "file": "ubuntu/Containerfile-24.04"},
+        {"version": "26.04", "context": "ubuntu", "file": "ubuntu/Containerfile-26.04"}
+      ]
+    }
+  ]
+}
