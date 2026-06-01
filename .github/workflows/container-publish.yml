@@ -40,25 +40,25 @@ jobs:
             context: rockylinux-9
             file: rockylinux-9/Containerfile
           - os: rockylinux
-            version: "9.6"
-            context: rockylinux-9
-            file: rockylinux-9/Containerfile-9.6
-          - os: rockylinux
             version: "9.7"
             context: rockylinux-9
             file: rockylinux-9/Containerfile-9.7
+          - os: rockylinux
+            version: "9.8"
+            context: rockylinux-9
+            file: rockylinux-9/Containerfile-9.8
           - os: rockylinux
             version: "10"
             context: rockylinux-10
             file: rockylinux-10/Containerfile
           - os: rockylinux
-            version: "10.0"
-            context: rockylinux-10
-            file: rockylinux-10/Containerfile-10.0
-          - os: rockylinux
             version: "10.1"
             context: rockylinux-10
             file: rockylinux-10/Containerfile-10.1
+          - os: rockylinux
+            version: "10.2"
+            context: rockylinux-10
+            file: rockylinux-10/Containerfile-10.2
           - os: almalinux
             version: "8"
             context: almalinux-8
@@ -76,25 +76,25 @@ jobs:
             context: almalinux-9
             file: almalinux-9/Containerfile
           - os: almalinux
-            version: "9.6"
-            context: almalinux-9
-            file: almalinux-9/Containerfile-9.6
-          - os: almalinux
             version: "9.7"
             context: almalinux-9
             file: almalinux-9/Containerfile-9.7
+          - os: almalinux
+            version: "9.8"
+            context: almalinux-9
+            file: almalinux-9/Containerfile-9.8
           - os: almalinux
             version: "10"
             context: almalinux-10
             file: almalinux-10/Containerfile
           - os: almalinux
-            version: "10.0"
-            context: almalinux-10
-            file: almalinux-10/Containerfile-10.0
-          - os: almalinux
             version: "10.1"
             context: almalinux-10
             file: almalinux-10/Containerfile-10.1
+          - os: almalinux
+            version: "10.2"
+            context: almalinux-10
+            file: almalinux-10/Containerfile-10.2
           - os: leap
             version: "15"
             context: leap
