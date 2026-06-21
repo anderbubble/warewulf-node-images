@@ -18,6 +18,9 @@ These containers are published on the [GitHub container registry][1].
 * [AlmaLinux 10](almalinux-10)
 * [openEuler 24.03](openeuler-24.03)
 * [openSUSE Leap](leap)
+* [openSUSE Tumbleweed](tumbleweed)
+* [Debian](debian)
+* [Ubuntu](ubuntu)
 
 ## Additional examples
 
