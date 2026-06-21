@@ -16,30 +16,43 @@ on:
 
 
 jobs:
-  # Generate build and merge matrices from images.json so each image is
-  # defined in one place. Adding an image or arch requires only editing
-  # images.json, not this workflow.
-  setup:
-    runs-on: ubuntu-latest
-    outputs:
-      build_matrix: ${{ steps.matrices.outputs.build_matrix }}
-      merge_matrix: ${{ steps.matrices.outputs.merge_matrix }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Generate matrices
-        id: matrices
-        run: python3 .github/workflows/gen-matrix.py >> "$GITHUB_OUTPUT"
-
-
   build:
-    needs: setup
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.arch.runner }}
 
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.build_matrix) }}
+      matrix:
+        arch:
+          - {platform: linux/amd64, runner: ubuntu-latest,    platform_pair: linux-amd64}
+          - {platform: linux/arm64, runner: ubuntu-24.04-arm, platform_pair: linux-arm64}
+        image:
+          - {os: rockylinux,  version: "8",      context: rockylinux-8,    file: rockylinux-8/Containerfile}
+          - {os: rockylinux,  version: "8.9",    context: rockylinux-8,    file: rockylinux-8/Containerfile-8.9}
+          - {os: rockylinux,  version: "8.10",   context: rockylinux-8,    file: rockylinux-8/Containerfile-8.10}
+          - {os: rockylinux,  version: "9",      context: rockylinux-9,    file: rockylinux-9/Containerfile}
+          - {os: rockylinux,  version: "9.7",    context: rockylinux-9,    file: rockylinux-9/Containerfile-9.7}
+          - {os: rockylinux,  version: "9.8",    context: rockylinux-9,    file: rockylinux-9/Containerfile-9.8}
+          - {os: rockylinux,  version: "10",     context: rockylinux-10,   file: rockylinux-10/Containerfile}
+          - {os: rockylinux,  version: "10.1",   context: rockylinux-10,   file: rockylinux-10/Containerfile-10.1}
+          - {os: rockylinux,  version: "10.2",   context: rockylinux-10,   file: rockylinux-10/Containerfile-10.2}
+          - {os: almalinux,   version: "8",      context: almalinux-8,     file: almalinux-8/Containerfile}
+          - {os: almalinux,   version: "8.9",    context: almalinux-8,     file: almalinux-8/Containerfile-8.9}
+          - {os: almalinux,   version: "8.10",   context: almalinux-8,     file: almalinux-8/Containerfile-8.10}
+          - {os: almalinux,   version: "9",      context: almalinux-9,     file: almalinux-9/Containerfile}
+          - {os: almalinux,   version: "9.7",    context: almalinux-9,     file: almalinux-9/Containerfile-9.7}
+          - {os: almalinux,   version: "9.8",    context: almalinux-9,     file: almalinux-9/Containerfile-9.8}
+          - {os: almalinux,   version: "10",     context: almalinux-10,    file: almalinux-10/Containerfile}
+          - {os: almalinux,   version: "10.1",   context: almalinux-10,    file: almalinux-10/Containerfile-10.1}
+          - {os: almalinux,   version: "10.2",   context: almalinux-10,    file: almalinux-10/Containerfile-10.2}
+          - {os: leap,        version: "15",     context: leap,            file: leap/Containerfile-15}
+          - {os: leap,        version: "16",     context: leap,            file: leap/Containerfile-16.0}
+          - {os: leap,        version: "16.0",   context: leap,            file: leap/Containerfile-16.0}
+          - {os: tumbleweed,  version: "latest", context: tumbleweed,      file: tumbleweed/Containerfile}
+          - {os: debian,      version: "12",     context: debian,          file: debian/Containerfile-12}
+          - {os: debian,      version: "13",     context: debian,          file: debian/Containerfile-13}
+          - {os: openeuler,   version: "24.03",  context: openeuler-24.03, file: openeuler-24.03/Containerfile}
+          - {os: ubuntu,      version: "24.04",  context: ubuntu,          file: ubuntu/Containerfile-24.04}
+          - {os: ubuntu,      version: "26.04",  context: ubuntu,          file: ubuntu/Containerfile-26.04}
 
     permissions:
       contents: read
@@ -54,8 +67,8 @@ jobs:
       # Some OS directories generate versioned Containerfiles from templates.
       - name: Generate versioned Containerfiles
         run: |
-          if [ -f "${{ matrix.context }}/Makefile" ]; then
-            make -C "${{ matrix.context }}"
+          if [ -f "${{ matrix.image.context }}/Makefile" ]; then
+            make -C "${{ matrix.image.context }}"
           fi
 
       - name: Setup Docker buildx
@@ -77,7 +90,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }}
+          images: ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.image.os }}
 
       # Build single-platform image and push by content-addressed digest.
       # No tag is written here; the merge job assembles the manifest index.
@@ -86,41 +99,34 @@ jobs:
         id: build
         uses: docker/build-push-action@v7
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.file }}
-          platforms: ${{ matrix.platform }}
-          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }},oci-mediatypes=true,push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.file }}
+          platforms: ${{ matrix.arch.platform }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.image.os }},oci-mediatypes=true,push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.os }}-${{ matrix.version }}-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.os }}-${{ matrix.version }}-${{ matrix.platform }}
+          cache-from: type=gha,scope=${{ matrix.image.os }}-${{ matrix.image.version }}-${{ matrix.arch.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.os }}-${{ matrix.image.version }}-${{ matrix.arch.platform }}
 
       - name: Export digest
-        if: github.event_name != 'pull_request'
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
+          echo "${{ matrix.image.os }}:${{ matrix.image.version }}" > "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.os }}-${{ matrix.version }}-${{ matrix.platform_pair }}
+          name: digests-${{ matrix.image.os }}-${{ matrix.image.version }}-${{ matrix.arch.platform_pair }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
 
 
   # Combine per-arch digests into a multi-arch manifest index, then sign.
-  # Skipped on pull requests — PRs validate builds only, never publish.
+  # On pull requests, logs the imagetools commands that would run without executing them.
   merge:
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
-    needs: [setup, build]
-
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.merge_matrix) }}
+    needs: build
 
     permissions:
       contents: read
@@ -131,7 +137,7 @@ jobs:
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
-          pattern: digests-${{ matrix.os }}-${{ matrix.version }}-*
+          pattern: digests-*
           merge-multiple: true
           path: /tmp/digests
 
@@ -145,31 +151,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }}
-          tags: |
-            type=schedule
-            type=raw,${{ matrix.version }}
-
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          mapfile -t tag_args < <(jq -cr '.tags[] | "-t", .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-          mapfile -t digest_args < <(printf 'ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }}@sha256:%s\n' *)
-          docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
-
       # Install the cosign tool
       # https://github.com/sigstore/cosign-installer
       - name: Install Cosign
+        if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3.5.0
 
-      # Sign the manifest index by digest — digests are immutable, tags are not.
+      # Each digest file is named by its hash; its content is "{os}:{version}".
+      # Group digests by image, create one manifest index per image, then sign.
+      # On PRs, log the imagetools commands instead of running them.
       # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
-      - name: Sign the manifest
+      - name: Create manifest lists and sign
         run: |
-          image="ghcr.io/${{ github.repository_owner }}/warewulf-${{ matrix.os }}:${{ matrix.version }}"
-          digest=$(docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}')
-          cosign sign --yes "${image}@${digest}"
+          declare -A image_digests
+          for f in /tmp/digests/*; do
+            hash=$(basename "$f")
+            read -r os_version < "$f"
+            os="${os_version%%:*}"; version="${os_version#*:}"
+            repo="ghcr.io/${{ github.repository_owner }}/warewulf-${os}"
+            image_digests["${os}:${version}"]+=" ${repo}@sha256:${hash}"
+          done
+
+          for key in "${!image_digests[@]}"; do
+            os="${key%%:*}"; version="${key#*:}"
+            image="ghcr.io/${{ github.repository_owner }}/warewulf-${os}:${version}"
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "[dry-run] docker buildx imagetools create -t ${image} ${image_digests[$key]}"
+            else
+              docker buildx imagetools create -t "${image}" ${image_digests["$key"]}
+              digest=$(docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}')
+              cosign sign --yes "${image}@${digest}"
+            fi
+          done
