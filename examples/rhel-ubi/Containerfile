@@ -1,0 +1,77 @@
+# A Warewulf node image built from the Red Hat Universal Base Image (UBI).
+#
+# The UBI base image only includes the UBI repositories (ubi.repo), which are
+# a subset of RHEL. To install the full RHEL package set we reuse the build
+# host's Red Hat subscription: on a registered host, podman and buildah
+# automatically expose the subscription to the build and the
+# subscription-manager dnf plugin writes /etc/yum.repos.d/redhat.repo.
+#
+# See README.md for how to provide the host subscription to the build and for
+# the relevant caveats.
+
+FROM registry.access.redhat.com/ubi9/ubi:latest
+
+# The release version of your Red Hat subscription (CDN or Satellite). This may
+# differ from the UBI image's own $releasever (e.g. "9.4" vs "9"), so we set it
+# explicitly to match the repository URLs that subscription-manager configures
+# in /etc/yum.repos.d/redhat.repo.
+ARG RELEASEVER=9
+
+RUN set -eux \
+    # The ubi.repo repositories overlap with the full RHEL BaseOS and AppStream
+    # repositories from the subscription. Remove it and rely on redhat.repo.
+    && rm -f /etc/yum.repos.d/ubi.repo \
+    # Pin $releasever to match the subscription's repository URLs.
+    && mkdir -p /etc/dnf/vars \
+    && echo "${RELEASEVER}" > /etc/dnf/vars/releasever \
+    && dnf clean all \
+    # subscription-manager disables BaseOS and AppStream by default in
+    # container mode; enable all subscribed repositories.
+    && dnf config-manager --set-enabled '*' \
+    && dnf upgrade -y \
+    && dnf install -y --allowerasing \
+      kernel \
+      kernel-core \
+      kernel-modules \
+      coreutils \
+      cpio \
+      dhclient \
+      e2fsprogs \
+      ethtool \
+      findutils \
+      initscripts \
+      ipmitool \
+      iproute \
+      ncurses \
+      net-tools \
+      NetworkManager \
+      nfs-utils \
+      openssh-clients \
+      openssh-server \
+      pciutils \
+      psmisc \
+      rsync \
+      rsyslog \
+      strace \
+      wget \
+      which \
+    && dnf clean all
+
+# Unmask what RHEL masked in the UBI base image.
+# Needed to get an actual login tty.
+RUN rm -f /etc/systemd/system/systemd-logind.service \
+    && rm -f /etc/systemd/system/getty.target \
+    && rm -f /etc/systemd/system/console-getty.service \
+    && rm -f /etc/systemd/system/sys-fs-fuse-connections.mount \
+    && rm -f /etc/systemd/system/systemd-remount-fs.service \
+    && rm -f /etc/systemd/system/dev-hugepages.mount
+
+COPY excludes /etc/warewulf/
+COPY container_exit.sh /etc/warewulf/
+RUN /etc/warewulf/container_exit.sh
+
+CMD [ "/bin/echo", "-e", \
+      "This image is intended to be used with the Warewulf cluster management and", \
+      "\nprovisioning system.", \
+      "\n", \
+      "\nFor more information about Warewulf, visit https://warewulf.org" ]
